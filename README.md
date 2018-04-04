@@ -1,2 +1,2 @@
 # MetabarcodingFilter
-Additional Metabarcoding Fitler
+Additional metabarcoding filters to correct for tag switching and polymerase biases
