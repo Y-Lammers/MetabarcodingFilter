@@ -3,11 +3,15 @@
 # Contact: youri.lammers@gmail.com
 
 # This tools process a set of metabarcoding libraries sequenced at the same time
-# and removes all sequences that could be caused due to tag switching events.
+# and removes all sequences that could be caused due to tag switching events. The
+# tool requires that the data has been demulitplexed (ngsfilter) and collapsed
+# (obiuniq) by the OBITools software package.
 
-# Usage: TagSwitchCorrect.py -fasta [list of fasta files] -tag [list of ngsfilter files]
-# note: the fasta files and the ngsfilter files need to be in the same order
+# Usage: TagSwitchCorrect.py -i [library link file]
 
+# The link file is in the following format:
+# FASTA sequence file {tab} NGSfilter file {tab} Number of raw reads in the library
+# were each library and associated files are placed on a single line
 
 # load a bunch of modules
 import sys, json, argparse, os, itertools
@@ -15,13 +19,48 @@ import sys, json, argparse, os, itertools
 # set argument parser
 parser = argparse.ArgumentParser(description = """Process a set of metabarcoding
 	libraries that were sequenced at the same time and remove all
-	sequences that could be cuased due to tag switching event""")
+	sequences that could be caused due to tag switching events""")
 
+parser.add_argument('-i', '--input', metavar='input overview file', dest='inputLib',
+			type=str, help="""TSV file containing the libraries, tag
+					information and read counts""", required=True)
 parser.add_argument('-f', '--fasta', nargs='+', metavar='fasta files', dest='fasta',
 			type=str, help='The dereplicated fasta files.', required=True)
 parser.add_argument('-t', '--tag', nargs='+', metavar='tag files', dest='tag',
 			type=str, help='The NGSfilter tag files.', required=True)
 args = parser.parse_args()
+
+
+def parse_input(inputfiles):
+
+	# parse through the input file and obtain the 
+	# file paths to the libraries, NGS filter files
+	# and the raw read counts. Return this info in a
+	# nested list
+
+	# create return list
+	libraryInfo = [[],[],[],[]]
+
+	# parse through the input file
+	for line in open(inputfiles):
+
+		# split the file based on tabs
+		line = line.strip().split('\t')
+
+		# add the info to the list
+		libraryInfo[0].append(line[0])
+		libraryInfo[1].append(line[1])
+		libraryInfo[2].append(int(line[2]))
+		
+	# calculate the proportion ratio for each
+	# library based on the raw read counts, this
+	# is needed to work out the swap rates later.
+	for lib in libraryInfo:
+		libraryInfo[3].append(lib[3]/float(
+		sum([count[2] for count in libraryInfo])))
+
+	# return the results
+	return libraryInfo
 
 
 def read_library(library_paths):
@@ -169,6 +208,7 @@ def analyse_tagswitch(tags, sequences):
 							float(sample_dict[item]))/1000):
 							filter_dict[item] = sample_dict[item]
 
-tags = read_tags(args.tag, args.fasta)
-sequences = read_library(args.fasta)
-analyse_tagswitch(tags, sequences)
+inputdata = parse_input(args.inputLib)
+#tags = read_tags(args.tag, args.fasta)
+#sequences = read_library(args.fasta)
+#analyse_tagswitch(tags, sequences)
