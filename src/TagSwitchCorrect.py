@@ -24,10 +24,6 @@ parser = argparse.ArgumentParser(description = """Process a set of metabarcoding
 parser.add_argument('-i', '--input', metavar='input overview file', dest='inputLib',
 			type=str, help="""TSV file containing the libraries, tag
 					information and read counts""", required=True)
-parser.add_argument('-f', '--fasta', nargs='+', metavar='fasta files', dest='fasta',
-			type=str, help='The dereplicated fasta files.', required=True)
-parser.add_argument('-t', '--tag', nargs='+', metavar='tag files', dest='tag',
-			type=str, help='The NGSfilter tag files.', required=True)
 args = parser.parse_args()
 
 
@@ -51,13 +47,13 @@ def parse_input(inputfiles):
 		libraryInfo[0].append(line[0])
 		libraryInfo[1].append(line[1])
 		libraryInfo[2].append(int(line[2]))
-		
+
 	# calculate the proportion ratio for each
 	# library based on the raw read counts, this
 	# is needed to work out the swap rates later.
-	for lib in libraryInfo:
-		libraryInfo[3].append(lib[3]/float(
-		sum([count[2] for count in libraryInfo])))
+	for i in range(0,len(libraryInfo[0])):
+		libraryInfo[3].append(libraryInfo[2][i]/float(
+		sum([count for count in libraryInfo[2]])))
 
 	# return the results
 	return libraryInfo
@@ -111,7 +107,7 @@ def read_library(library_paths):
 	return sequences
 
 
-def read_tags(tag_paths, library_paths):
+def read_tags(inputdata):
 
 	# parse through the NGSfilter tag files and extract
 	# the PCR tag - sample name information per library.
@@ -127,10 +123,10 @@ def read_tags(tag_paths, library_paths):
 	# The tag files and library files are connected based
 	# on their position in the file lists (tag file 1 belongs
 	# to library file 1, etc)
-	for position in range(len(tag_paths)):
+	for position in range(len(inputdata[1])):
 
 		# parse through the tag file
-		for line in open(tag_paths[position]):
+		for line in open(inputdata[1][position]):
 
 			# skip the comment line
 			if line[0] == '#': continue
@@ -143,9 +139,11 @@ def read_tags(tag_paths, library_paths):
 			# in combination with the library path.
 			# create the tag item if not already present.
 			try:
-				tags[line[2]][library_paths[position]] = line[1]
+				tags[line[2]][inputdata[0][position]] = \
+					[line[1],inputdata[3][position]]
 			except:
-				tags[line[2]] = {library_paths[position]: line[1]}
+				tags[line[2]] = {inputdata[0][position]: \
+					[line[1],inputdata[3][position]]}
 
 	return tags
 
@@ -155,15 +153,19 @@ def analyse_tagswitch(tags, sequences):
 	# analyse each tag across all libraries and
 	# compare read numbers
 
-	count2 = 0
+	# universal swap rate, currently set to 1%
+	swaprate = 0.01
+
+	# filtered sequence dictionary which will
+	# store the final results.
+	sequence_dict = {}
 
 	# go through the tag list
-	for tag in tags:
+	#for tag in tags:
+	for tag in ['GAGCTTAC:GAGCTTAC']:
 
 		# set the sample dictionary
 		sample_dict = {}
-
-		count = 0
 
 		# loop through the sequences and print
 		# the sequence + occurences for the samples
@@ -178,37 +180,54 @@ def analyse_tagswitch(tags, sequences):
 			# sequence, if so add it to the temporary dict
 			for sample in tags[tag]:
 				try:
-					sample_dict[tags[tag][sample]] = \
-						sequences[sequence][tags[tag][sample]]
+					sample_dict[tags[tag][sample][0]] = \
+						[sequences[sequence][tags[tag][sample][0]]
+						,tags[tag][sample][1]]
 				except:
 					pass
 
-			if len(sample_dict) >= 2:
+			# ignore sequences that have no reads for a
+			# certain tag.
+			if len(sample_dict) == 0: continue
 
-				# create a new variable for the filtered
-				# sample numbers and calculate the total
-				# number of reads across al samples for a
-				# given sequence and tag
-				filter_dict, tot_sum = {}, sum([sample_dict[a] 
-					for a in sample_dict])
+			# create a new variable for the filtered
+			# sample numbers and calculate the total
+			# number of reads across al samples for a
+			# given sequence and tag
+			filter_dict, tot_sum = {}, sum([sample_dict[sample][0] 
+				for sample in sample_dict])
 
-				# for each sample, check if the number of reads
-				# is higher than a 1000th of the total read pool
-				# minus the sample readsm. If the number of reads
-				# is lower than the sum - sample, it is potentially
-				# caused by tagswitching and removed, if it is
-				# higher, it is stored in the new filter variable
-				for item in sample_dict:
-					if "not" in item:
-						notused = 1
-						prop = float(sample_dict[item])/tot_sum# - sample_dict[item])
-						swap = 1/float(0.038/prop)
-						print '{0}\t{1}\t{2}\t{3}'.format(sequence, str(prop), str(swap),str(sample_dict[item]))#str(float(sample_dict[item])/(tot_sum - sample_dict[item])))
-						if sample_dict[item] >= round((tot_sum - 
-							float(sample_dict[item]))/1000):
-							filter_dict[item] = sample_dict[item]
+			# for each sample, check if the number of reads
+			# is higher than the proportion of the library
+			# times the swap rate. If the number of reads is
+			# lower remove it, if it is higher add it to the
+			# new filtered dictionary.
+			for sample in sample_dict:
+				prop = float(sample_dict[sample][0])/tot_sum
+				#if sample_dict[sample][0] >= round((tot_sum - 
+				#	float(sample_dict[sample][0]))/1000):
+				#	filter_dict[sample] = sample_dict[sample]
+				if sample_dict[sample][0] >= (swaprate*tot_sum*
+					sample_dict[sample][1]):
+					try:
+						sequence_dict[sequence][sample] = \
+							sample_dict[sample]
+					except:
+						sequence_dict[sequence] = \
+							{sample: sample_dict[sample]}
+
+	# return the filtered dictionary
+	return sequence_dict
+
 
 inputdata = parse_input(args.inputLib)
-#tags = read_tags(args.tag, args.fasta)
-#sequences = read_library(args.fasta)
-#analyse_tagswitch(tags, sequences)
+tags = read_tags(inputdata)
+sequences = read_library(inputdata[0])
+filter_dict = analyse_tagswitch(tags, sequences)
+
+count = 0
+for i in filter_dict:
+	print i
+	print filter_dict[i]
+	count += 1
+	if count >= 10: break
