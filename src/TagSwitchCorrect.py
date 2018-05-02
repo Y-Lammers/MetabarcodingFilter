@@ -115,8 +115,8 @@ def read_tags(inputdata):
 	# following format:
 	# {tag:{library:sample_name}}
 	
-	# create the tag variable
-	tags = {}
+	# create the tag and sample variable
+	tags, samples = {}, {}
 
 	# loop through the tag and sequence paths and extract the
 	# tag - sample name combinations for each library.
@@ -145,7 +145,19 @@ def read_tags(inputdata):
 				tags[line[2]] = {inputdata[0][position]: \
 					[line[1],inputdata[3][position]]}
 
-	return tags
+			# add the sample names to a dictionary
+			# containing the library names, if the
+			# library is not present, add it.
+			try:
+				samples[inputdata[0][position]].append(
+					line[1])
+			except:
+				samples[inputdata[0][position]] = \
+					[line[1]]
+
+	# return a list containing the tag information and sample names
+	# for each library
+	return [tags, samples]
 
 
 def analyse_tagswitch(tags, sequences):
@@ -162,7 +174,7 @@ def analyse_tagswitch(tags, sequences):
 
 	# go through the tag list
 	#for tag in tags:
-	for tag in ['GAGCTTAC:GAGCTTAC']:
+	for tag in ['GAGCTTAC:GAGCTTAC','GCTTGTGAC:GCTTGTGAC','GTCTGTTCG:GTCTGTTCG','ACAACCGA:ACAACCGA']:
 
 		# set the sample dictionary
 		sample_dict = {}
@@ -220,14 +232,78 @@ def analyse_tagswitch(tags, sequences):
 	return sequence_dict
 
 
-inputdata = parse_input(args.inputLib)
-tags = read_tags(inputdata)
-sequences = read_library(inputdata[0])
-filter_dict = analyse_tagswitch(tags, sequences)
+def write_results(library, library_dict):
 
-count = 0
-for i in filter_dict:
-	print i
-	print filter_dict[i]
-	count += 1
-	if count >= 10: break
+	# write the filtered results to a new library file.
+	# the file will replace the fasta extension with tagswap.fasta
+	
+	# open the outputfile
+	output = open(os.path.splitext(library)[0] + '.tagswap.fasta', 'w')	
+
+	# set the output name that will be included in the fasta
+	# header along with the sequence number
+	name, count = os.path.basename(library).split('.')[0], 1
+
+	# go through the sequences in the library and write them
+	# to the output file
+	for seq in library_dict:
+
+		# check if there are sequences present, if not skip
+		if len(library_dict[seq]['sample']) >= 1:
+
+			pass
+			# prepare the fasta header
+
+		else:
+			print name			
+			print library_dict[seq]
+			print seq
+
+
+	# close the outputfile
+	output.close()
+
+
+def output_results(sequence_dict, samples):
+
+	# print the filtered sequence for each library
+
+	# go through each library and get the samples and sequence counts
+	for inputfile in samples:
+
+		# set the library dictionary that will hold all the info
+		# for each library	
+		library_dict = {}		
+
+		# parse through the list of sequences in the tagswap
+		# filtered dictionary
+		for sequence in sequence_dict:
+
+			# for each sequence, three things will be kept:
+			# the samples that have the sequence, the number of
+			# read for the sequence per sample and the sum
+			# reads for the library
+			library_dict[sequence] = {'count': 0, 'sample': {}}
+
+			# go through the samples for a sequence
+			for hit in sequence_dict[sequence]:
+
+				# if the sample is from the current library:
+				if hit in samples[inputfile]:
+					# increase the total count with the
+					# number of reads for the sample
+					library_dict[sequence]['count'] += \
+						sequence_dict[sequence][hit][0]
+					# add the sample + count
+					library_dict[sequence]['sample'][hit] = \
+						sequence_dict[sequence][hit][0]
+
+		# when the library is complete, write it to the output file
+		write_results(inputfile, library_dict)
+		
+
+inputdata = parse_input(args.inputLib)
+tags, samples = read_tags(inputdata)
+sequences = read_library(inputdata[0])
+sequence_dict = analyse_tagswitch(tags, sequences)
+output_results(sequence_dict,samples)
