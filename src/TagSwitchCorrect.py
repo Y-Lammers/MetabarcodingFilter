@@ -15,6 +15,7 @@
 
 # load a bunch of modules
 import sys, json, argparse, os, itertools
+from collections import defaultdict
 
 # set argument parser
 parser = argparse.ArgumentParser(description = """Process a set of metabarcoding
@@ -24,6 +25,9 @@ parser = argparse.ArgumentParser(description = """Process a set of metabarcoding
 parser.add_argument('-i', '--input', metavar='input overview file', dest='inputLib',
 			type=str, help="""TSV file containing the libraries, tag
 					information and read counts""", required=True)
+parser.add_argument('-s', '--swaprate', metavar='index swap rate', dest='swaprate',
+			type=float, help="""The index swap rate that the tool will
+					use, default = 0.01""", default=0.01)
 args = parser.parse_args()
 
 
@@ -68,7 +72,7 @@ def read_library(library_paths):
 	# {sequence:{sample_name:count}}
 
 	# create the sequences variable
-	sequences = {}
+	sequences = defaultdict(dict)
 
 	# loop through the library paths and open each path
 	# to extract the sequence and sample information
@@ -78,7 +82,8 @@ def read_library(library_paths):
 		seq_file = open(path)
 
 		# parse through the fasta file and obtain the sequences
-		seq_groups = (x[1] for x in itertools.groupby(seq_file, key=lambda line: line[0] == '>'))
+		seq_groups = (x[1] for x in itertools.groupby(seq_file,
+			key=lambda line: line[0] == '>'))
 		for header in seq_groups:
 
 			# get the fasta header and parse out the
@@ -95,10 +100,8 @@ def read_library(library_paths):
 			# sequence to the sequence dictionary
 			# if it fails, add a new entry
 			for sample in samples:
-				try:
-					sequences[sequence][sample] = samples[sample]
-				except:
-					sequences[sequence] = {sample: samples[sample]}
+				sequences[sequence]['_'.join([path,sample])] = \
+					samples[sample]
 
 		# close the sequence file
 		seq_file.close()
@@ -116,7 +119,7 @@ def read_tags(inputdata):
 	# {tag:{library:sample_name}}
 	
 	# create the tag and sample variable
-	tags, samples = {}, {}
+	tags, samples = defaultdict(dict), defaultdict(list)
 
 	# loop through the tag and sequence paths and extract the
 	# tag - sample name combinations for each library.
@@ -138,22 +141,15 @@ def read_tags(inputdata):
 			# sequence (3rd column) to the tag dictionary
 			# in combination with the library path.
 			# create the tag item if not already present.
-			try:
-				tags[line[2]][inputdata[0][position]] = \
-					[line[1],inputdata[3][position]]
-			except:
-				tags[line[2]] = {inputdata[0][position]: \
-					[line[1],inputdata[3][position]]}
+			tags[line[2]][inputdata[0][position]] = \
+				['_'.join([inputdata[0][position],line[1]]),
+				inputdata[3][position]]
 
 			# add the sample names to a dictionary
 			# containing the library names, if the
 			# library is not present, add it.
-			try:
-				samples[inputdata[0][position]].append(
-					line[1])
-			except:
-				samples[inputdata[0][position]] = \
-					[line[1]]
+			samples[inputdata[0][position]].append(
+				'_'.join([inputdata[0][position],line[1]]))
 
 	# return a list containing the tag information and sample names
 	# for each library
@@ -166,18 +162,16 @@ def analyse_tagswitch(tags, sequences):
 	# compare read numbers
 
 	# universal swap rate, currently set to 1%
-	swaprate = 0.01
+	swaprate = args.swaprate
 
 	# filtered sequence dictionary which will
 	# store the final results.
-	sequence_dict = {}
+	#sequence_dict = {}
+	sequence_dict = defaultdict(dict)
 
 	# go through the tag list
 	for tag in tags:
 	#for tag in ['GAGCTTAC:GAGCTTAC','GCTTGTGAC:GCTTGTGAC','GTCTGTTCG:GTCTGTTCG','ACAACCGA:ACAACCGA']:
-
-		# set the sample dictionary
-		sample_dict = {}
 
 		# loop through the sequences and print
 		# the sequence + occurences for the samples
@@ -206,7 +200,7 @@ def analyse_tagswitch(tags, sequences):
 			# sample numbers and calculate the total
 			# number of reads across al samples for a
 			# given sequence and tag
-			filter_dict, tot_sum = {}, sum([sample_dict[sample][0] 
+			tot_sum = sum([sample_dict[sample][0] 
 				for sample in sample_dict])
 
 			# for each sample, check if the number of reads
@@ -216,17 +210,10 @@ def analyse_tagswitch(tags, sequences):
 			# new filtered dictionary.
 			for sample in sample_dict:
 				prop = float(sample_dict[sample][0])/tot_sum
-				#if sample_dict[sample][0] >= round((tot_sum - 
-				#	float(sample_dict[sample][0]))/1000):
-				#	filter_dict[sample] = sample_dict[sample]
 				if sample_dict[sample][0] >= (swaprate*tot_sum*
 					sample_dict[sample][1]):
-					try:
-						sequence_dict[sequence][sample] = \
-							sample_dict[sample]
-					except:
-						sequence_dict[sequence] = \
-							{sample: sample_dict[sample]}
+					sequence_dict[sequence][sample] = \
+						sample_dict[sample]
 
 	# return the filtered dictionary
 	return sequence_dict
@@ -299,7 +286,8 @@ def output_results(sequence_dict, samples):
 					library_dict[sequence]['count'] += \
 						sequence_dict[sequence][hit][0]
 					# add the sample + count
-					library_dict[sequence]['sample'][hit] = \
+					library_dict[sequence]['sample'][hit.replace(
+						inputfile+"_",'')] = \
 						sequence_dict[sequence][hit][0]
 
 		# when the library is complete, write it to the output file
