@@ -173,8 +173,8 @@ def analyse_tagswitch(tags, sequences):
 	sequence_dict = {}
 
 	# go through the tag list
-	#for tag in tags:
-	for tag in ['GAGCTTAC:GAGCTTAC','GCTTGTGAC:GCTTGTGAC','GTCTGTTCG:GTCTGTTCG','ACAACCGA:ACAACCGA']:
+	for tag in tags:
+	#for tag in ['GAGCTTAC:GAGCTTAC','GCTTGTGAC:GCTTGTGAC','GTCTGTTCG:GTCTGTTCG','ACAACCGA:ACAACCGA']:
 
 		# set the sample dictionary
 		sample_dict = {}
@@ -251,14 +251,18 @@ def write_results(library, library_dict):
 		# check if there are sequences present, if not skip
 		if len(library_dict[seq]['sample']) >= 1:
 
-			pass
 			# prepare the fasta header
+			header = '>{0}:{1} merged_sample={2}; count={3};\n'.format(
+					name,count,library_dict[seq]['sample'],
+					library_dict[seq]['count'])
 
-		else:
-			print name			
-			print library_dict[seq]
-			print seq
+			# write the header and sequence to the
+			# output file
+			output.write(header)
+			output.write(seq + '\n')
 
+			# increment the sequence count
+			count += 1
 
 	# close the outputfile
 	output.close()
