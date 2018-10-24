@@ -141,15 +141,15 @@ def read_tags(inputdata):
 			# sequence (3rd column) to the tag dictionary
 			# in combination with the library path.
 			# create the tag item if not already present.
-			tags[line[2]][inputdata[0][position]] = \
-				['_'.join([inputdata[0][position],line[1]]),
+			tags[line[1]][inputdata[0][position]] = \
+				['_'.join([inputdata[0][position],line[0]]),
 				inputdata[3][position]]
 
 			# add the sample names to a dictionary
 			# containing the library names, if the
 			# library is not present, add it.
 			samples[inputdata[0][position]].append(
-				'_'.join([inputdata[0][position],line[1]]))
+				'_'.join([inputdata[0][position],line[0]]))
 
 	# return a list containing the tag information and sample names
 	# for each library
