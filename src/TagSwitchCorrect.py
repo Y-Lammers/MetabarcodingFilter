@@ -33,7 +33,7 @@ args = parser.parse_args()
 
 def parse_input(inputfiles):
 
-	# parse through the input file and obtain the 
+	# parse through the input file and obtain the
 	# file paths to the libraries, NGS filter files
 	# and the raw read counts. Return this info in a
 	# nested list
@@ -117,7 +117,7 @@ def read_tags(inputdata):
 	# The information is stored in a dictionary with the
 	# following format:
 	# {tag:{library:sample_name}}
-	
+
 	# create the tag and sample variable
 	tags, samples = defaultdict(dict), defaultdict(list)
 
@@ -137,19 +137,40 @@ def read_tags(inputdata):
 			# split the line based on tabs
 			line = line.strip().split('\t')
 
-			# add the sample names (2nd column) and tag
-			# sequence (3rd column) to the tag dictionary
-			# in combination with the library path.
-			# create the tag item if not already present.
-			tags[line[1]][inputdata[0][position]] = \
-				['_'.join([inputdata[0][position],line[0]]),
-				inputdata[3][position]]
+			# check the tag sample format, either 2 columns
+			# (base file) or >=5 (full tag file), adjust the
+			# columns accordingly
+			if len(line) == 2:
 
-			# add the sample names to a dictionary
-			# containing the library names, if the
-			# library is not present, add it.
-			samples[inputdata[0][position]].append(
-				'_'.join([inputdata[0][position],line[0]]))
+				# add the sample names (1st column) and tag
+				# sequence (2nd column) to the tag dictionary
+				# in combination with the library path.
+				# create the tag item if not already present.
+				tags[line[1]][inputdata[0][position]] = \
+					['_'.join([inputdata[0][position],line[0]]),
+					inputdata[3][position]]
+
+				# add the sample names to a dictionary
+				# containing the library names, if the
+				# library is not present, add it.
+				samples[inputdata[0][position]].append(
+					'_'.join([inputdata[0][position],line[0]]))
+
+			else:
+
+				# add the sample names (2nd column) and tag
+				# sequence (3rd column) to the tag dictionary
+				# in combination with the library path.
+				# create the tag item if not already present.
+				tags[line[2]][inputdata[0][position]] = \
+					['_'.join([inputdata[0][position],line[1]]),
+					inputdata[3][position]]
+
+				# add the sample names to a dictionary
+				# containing the library names, if the
+				# library is not present, add it.
+				samples[inputdata[0][position]].append(
+					'_'.join([inputdata[0][position],line[1]]))
 
 	# return a list containing the tag information and sample names
 	# for each library
@@ -166,17 +187,15 @@ def analyse_tagswitch(tags, sequences):
 
 	# filtered sequence dictionary which will
 	# store the final results.
-	#sequence_dict = {}
 	sequence_dict = defaultdict(dict)
 
 	# go through the tag list
 	for tag in tags:
-	#for tag in ['GAGCTTAC:GAGCTTAC','GCTTGTGAC:GCTTGTGAC','GTCTGTTCG:GTCTGTTCG','ACAACCGA:ACAACCGA']:
 
 		# loop through the sequences and print
 		# the sequence + occurences for the samples
 		for sequence in sequences:
-			
+
 			# set the temporary storage variable for
 			# the sample and sample numbers
 			sample_dict = {}
@@ -200,7 +219,7 @@ def analyse_tagswitch(tags, sequences):
 			# sample numbers and calculate the total
 			# number of reads across al samples for a
 			# given sequence and tag
-			tot_sum = sum([sample_dict[sample][0] 
+			tot_sum = sum([sample_dict[sample][0]
 				for sample in sample_dict])
 
 			# for each sample, check if the number of reads
@@ -222,10 +241,10 @@ def analyse_tagswitch(tags, sequences):
 def write_results(library, library_dict):
 
 	# write the filtered results to a new library file.
-	# the file will replace the fasta extension with tagswap.fasta
-	
+	# the file will replace the fasta extension with index_swap.fasta
+
 	# open the outputfile
-	output = open(os.path.splitext(library)[0] + '.tagswap.fasta', 'w')	
+	output = open(os.path.splitext(library)[0] + '.index_swap.fasta', 'w')
 
 	# set the output name that will be included in the fasta
 	# header along with the sequence number
@@ -263,8 +282,8 @@ def output_results(sequence_dict, samples):
 	for inputfile in samples:
 
 		# set the library dictionary that will hold all the info
-		# for each library	
-		library_dict = {}		
+		# for each library
+		library_dict = {}
 
 		# parse through the list of sequences in the tagswap
 		# filtered dictionary
@@ -292,7 +311,7 @@ def output_results(sequence_dict, samples):
 
 		# when the library is complete, write it to the output file
 		write_results(inputfile, library_dict)
-		
+
 
 inputdata = parse_input(args.inputLib)
 tags, samples = read_tags(inputdata)
