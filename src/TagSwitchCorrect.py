@@ -88,13 +88,15 @@ def read_library(library_paths):
 
 			# get the fasta header and parse out the
 			# sample name and count information
-			header = header.next().strip()
+			header = next(header).strip()
+			#header = header.next().strip()
 			descrip = header.split("merged_sample=")[1]
 			descrip = descrip.split(";")[0]
 			samples = json.loads(descrip.replace("\'","\""))
 
 			# get the fasta sequence
-			sequence = ''.join(seq_line.strip() for seq_line in seq_groups.next())
+			#sequence = ''.join(seq_line.strip() for seq_line in seq_groups.next())
+			sequence = ''.join(seq_line.strip() for	seq_line in next(seq_groups))
 
 			# try to add the sample information for the
 			# sequence to the sequence dictionary
